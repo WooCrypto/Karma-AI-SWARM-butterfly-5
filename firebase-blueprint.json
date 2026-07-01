@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "WalletProfile": {
+      "title": "Wallet Profile",
+      "description": "Represents a connected wallet and its digital reputation score/butterfly details.",
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string",
+          "description": "The unique public key / address of the wallet."
+        },
+        "connectedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the wallet profile was first created."
+        },
+        "lastSeen": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp of the last activity seen."
+        },
+        "verifiedNfts": {
+          "type": "array",
+          "description": "List of verified NFTs associated with this profile."
+        },
+        "detectedAlignment": {
+          "type": "string",
+          "enum": ["light", "dark", "chaos", "order"],
+          "description": "Alignment detected based on reputation scan."
+        },
+        "detectedSeed": {
+          "type": "string",
+          "description": "Seed used for generating the customized butterfly."
+        },
+        "isEvolved": {
+          "type": "boolean",
+          "description": "Whether the butterfly has been evolved by the user."
+        },
+        "selectedBadge": {
+          "type": "string",
+          "description": "The current badge selected for display on the overlay."
+        },
+        "customOverlayImg": {
+          "type": "string",
+          "description": "Base64 or reference URL of the custom overlay image."
+        },
+        "customOverlayName": {
+          "type": "string",
+          "description": "Optional name displayed on the custom overlay."
+        },
+        "isCustomApplied": {
+          "type": "boolean",
+          "description": "Whether custom overlay styling has been applied."
+        }
+      },
+      "required": ["address", "connectedAt", "lastSeen", "detectedAlignment", "detectedSeed", "isEvolved", "selectedBadge"]
+    }
+  },
+  "firestore": {
+    "/wallets/{walletId}": {
+      "schema": "WalletProfile",
+      "description": "Main collection storing reputation data and customization settings for each scanned wallet address."
+    }
+  }
+}

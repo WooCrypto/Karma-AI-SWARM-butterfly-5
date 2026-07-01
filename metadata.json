@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Remix: Karma Butterflies update 5",
+  "description": "The official landing page for Karma Butterflies NFT project, representing trust, reputation, and the butterfly effect in the crypto ecosystem.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

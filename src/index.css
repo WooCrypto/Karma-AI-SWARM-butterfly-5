@@ -1,0 +1,367 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer utilities {
+  .animate-pulse-glow {
+    animation: pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.4));
+  }
+  50% {
+    opacity: .7;
+    filter: drop-shadow(0 0 15px rgba(34, 211, 238, 0.8));
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+  background-color: #050505;
+}
+
+/* High Contrast Light Mode Readability Styles */
+html.light-mode {
+  background-color: #FAFBFD !important;
+  color: #0F172A !important;
+}
+
+html.light-mode body {
+  background-color: #FAFBFD !important;
+  color: #0F172A !important;
+}
+
+/* Background element overrides for ALL types of sections and parent container tags */
+html.light-mode .bg-\[\#050505\],
+html.light-mode .bg-\[\#070708\],
+html.light-mode .bg-\[\#090909\],
+html.light-mode .bg-\[\#09090a\],
+html.light-mode .bg-\[\#0a0a0a\],
+html.light-mode .bg-\[\#0d0d0e\],
+html.light-mode .bg-\[\#040405\],
+html.light-mode .bg-\[\#08080a\],
+html.light-mode .bg-slate-950,
+html.light-mode .bg-neutral-950,
+html.light-mode .bg-stone-950,
+html.light-mode .min-h-screen,
+html.light-mode header,
+html.light-mode section,
+html.light-mode footer {
+  background-color: #FAFBFD !important;
+  background-image: none !important;
+  color: #0F172A !important;
+}
+
+/* Clear all dark gradients by removing background-image in light mode */
+html.light-mode [class*="from-stone-"],
+html.light-mode [class*="from-neutral-"],
+html.light-mode [class*="from-slate-"],
+html.light-mode [class*="from-zinc-"],
+html.light-mode [class*="from-black"],
+html.light-mode [class*="from-[#1"],
+html.light-mode [class*="from-[#0"],
+html.light-mode [class*="from-[#2"],
+html.light-mode [class*="via-stone-"],
+html.light-mode [class*="via-neutral-"],
+html.light-mode [class*="via-slate-"],
+html.light-mode [class*="via-[#1"],
+html.light-mode [class*="via-[#0"],
+html.light-mode [class*="via-[#2"],
+html.light-mode [class*="to-stone-"],
+html.light-mode [class*="to-neutral-"],
+html.light-mode [class*="to-slate-"],
+html.light-mode [class*="to-zinc-"],
+html.light-mode [class*="to-black"],
+html.light-mode [class*="to-[#1"],
+html.light-mode [class*="to-[#0"],
+html.light-mode [class*="to-[#2"] {
+  background-image: none !important;
+}
+
+/* Force dark card/box elements to get clean white backgrounds instead of dark shades */
+html.light-mode div[class*="bg-[#1"],
+html.light-mode div[class*="bg-[#0"],
+html.light-mode div[class*="bg-[#2"],
+html.light-mode div[class*="bg-neutral-"],
+html.light-mode div[class*="bg-slate-"],
+html.light-mode div[class*="bg-zinc-"],
+html.light-mode div[class*="bg-stone-"],
+html.light-mode div[class*="bg-[#111]"],
+html.light-mode div[class*="bg-[#111111]"],
+html.light-mode div[class*="bg-[#111112]"],
+html.light-mode div[class*="bg-[#1A1A1A]"],
+html.light-mode div[class*="bg-[#121214]"],
+html.light-mode div[class*="bg-[#0c0c0e]"],
+html.light-mode div[class*="bg-[#0d0d0e]"],
+html.light-mode div[class*="bg-[#0A0A0A]"],
+html.light-mode div[class*="bg-[#050505]"],
+html.light-mode div[class*="bg-black"],
+html.light-mode div.bg-black\/40,
+html.light-mode div.bg-black\/50,
+html.light-mode div.bg-black\/60,
+html.light-mode div.bg-black\/35,
+html.light-mode div.bg-black\/80,
+html.light-mode div[class*="bg-black/"],
+html.light-mode blockquote[class*="bg-"],
+html.light-mode [class*="bg-neutral-900"],
+html.light-mode [class*="bg-slate-900"],
+html.light-mode [class*="bg-zinc-900"],
+html.light-mode [class*="bg-stone-900"],
+html.light-mode button[class*="bg-stone-"],
+html.light-mode button[class*="bg-neutral-"],
+html.light-mode button[class*="bg-slate-"],
+html.light-mode button[class*="bg-[#1"],
+html.light-mode button[class*="bg-[#0"] {
+  background-color: #FFFFFF !important;
+  background-image: none !important;
+  border-color: #E2E8F0 !important;
+  color: #0F172A !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Base text color mapping for perfect readability under light backgrounds */
+html.light-mode p,
+html.light-mode li,
+html.light-mode blockquote,
+html.light-mode label,
+html.light-mode dt,
+html.light-mode dd,
+html.light-mode [class*="text-slate-"],
+html.light-mode [class*="text-zinc-"],
+html.light-mode [class*="text-neutral-"],
+html.light-mode [class*="text-stone-"],
+html.light-mode [class*="text-gray-"],
+html.light-mode [class*="text-amber-100"],
+html.light-mode [class*="text-amber-200"],
+html.light-mode [class*="text-amber-300"],
+html.light-mode [class*="text-orange-"] {
+  color: #1E293B !important;
+}
+
+html.light-mode h1,
+html.light-mode h2,
+html.light-mode h3,
+html.light-mode h4,
+html.light-mode h5,
+html.light-mode h6,
+html.light-mode .text-white,
+html.light-mode strong,
+html.light-mode b,
+html.light-mode th {
+  color: #0F172A !important;
+}
+
+/* Interactive hover transitions */
+html.light-mode [class*="hover:bg-white/"]:hover,
+html.light-mode [class*="hover:bg-neutral-900/"]:hover,
+html.light-mode [class*="hover:bg-black/"]:hover {
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+
+/* Borders, outlines and dividing lines wildcard matches */
+html.light-mode [class*="border-white/"],
+html.light-mode [class*="border-slate-800/"],
+html.light-mode [class*="border-neutral-800/"],
+html.light-mode [class*="border-neutral-900/"],
+html.light-mode [class*="border-zinc-800/"],
+html.light-mode [class*="border-gray-800/"],
+html.light-mode .border-white\/10,
+html.light-mode .border-white\/5,
+html.light-mode .border-slate-800\/65,
+html.light-mode .border-slate-900,
+html.light-mode .border-slate-800,
+html.light-mode .border-neutral-800,
+html.light-mode .divide-white\/5,
+html.light-mode [class*="border-"] {
+  border-color: #E2E8F0 !important;
+  border-bottom-color: #E2E8F0 !important;
+  border-top-color: #E2E8F0 !important;
+  border-left-color: #E2E8F0 !important;
+  border-right-color: #E2E8F0 !important;
+}
+
+/* Ensure the top invitation announcement bar is full readability */
+html.light-mode .fixed.top-0.left-0.right-0 {
+  background-color: #D97706 !important;
+  border-bottom: 1px solid #B45309 !important;
+  color: #FFFFFF !important;
+}
+html.light-mode .fixed.top-0.left-0.right-0 span,
+html.light-mode .fixed.top-0.left-0.right-0 strong,
+html.light-mode .fixed.top-0.left-0.right-0 button,
+html.light-mode .fixed.top-0.left-0.right-0 a {
+  color: #FFFFFF !important;
+}
+
+/* Navigation bar styling */
+html.light-mode nav#main-nav {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light-mode nav#main-nav.bg-slate-950\/85 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html.light-mode nav#main-nav a,
+html.light-mode nav#main-nav span {
+  color: #334155 !important;
+}
+
+html.light-mode nav#main-nav a:hover {
+  color: #D97706 !important;
+}
+
+html.light-mode button#nav-scan-wallet-btn {
+  background-color: #F8FAFC !important;
+  border-color: #D97706 !important;
+}
+
+html.light-mode button#nav-scan-wallet-btn:hover {
+  background-color: #F1F5F9 !important;
+}
+
+html.light-mode button#nav-scan-wallet-btn span {
+  color: #D97706 !important;
+}
+
+/* Forms, Inputs, Dropdowns, Selects and text fields */
+html.light-mode input,
+html.light-mode textarea,
+html.light-mode select {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border: 1px solid #CBD5E1 !important;
+}
+
+html.light-mode input::placeholder,
+html.light-mode textarea::placeholder {
+  color: #94A3B8 !important;
+}
+
+/* Modal overlays and inner content blocks */
+html.light-mode div.bg-black\/95 {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+html.light-mode div.bg-\[\#090909\],
+html.light-mode div.bg-\[\#09090a\],
+html.light-mode div.bg-\[\#0d0d0e\] {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Tables and database lists */
+html.light-mode tr.border-b,
+html.light-mode li.border-b,
+html.light-mode ul.divide-y > li {
+  border-color: #E2E8F0 !important;
+}
+
+html.light-mode th {
+  color: #475569 !important;
+  border-color: #E2E8F0 !important;
+}
+
+/* Adaptive accent overrides for pristine font contrast */
+html.light-mode .text-\[\#F59E0B\],
+html.light-mode .text-amber-400,
+html.light-mode .text-amber-550,
+html.light-mode .text-amber-500 {
+  color: #B45309 !important; /* Elegant robust bronze for high light-mode contrast */
+}
+
+html.light-mode .text-cyan-400 {
+  color: #0284C7 !important; /* Readable dark sky blue */
+}
+
+html.light-mode .text-purple-400 {
+  color: #7E22CE !important; /* Readable deep purple */
+}
+
+html.light-mode .text-emerald-400,
+html.light-mode .text-emerald-450 {
+  color: #047857 !important; /* Readable rich forest green */
+}
+
+/* Styling badges or highlight tags in Light Mode */
+html.light-mode .bg-amber-500\/15,
+html.light-mode .bg-amber-500\/10,
+html.light-mode .bg-\[\#F59E0B\]\/10,
+html.light-mode .bg-amber-950\/20,
+html.light-mode .bg-amber-950\/10,
+html.light-mode [class*="bg-amber-500/"],
+html.light-mode [class*="bg-amber-950/"],
+html.light-mode [class*="bg-emerald-550/"],
+html.light-mode [class*="bg-emerald-500/"],
+html.light-mode [class*="bg-emerald-950/"],
+html.light-mode [class*="bg-purple-500/"],
+html.light-mode [class*="bg-purple-950/"],
+html.light-mode [class*="bg-cyan-500/"],
+html.light-mode [class*="bg-cyan-950/"],
+html.light-mode [class*="bg-white/5"] {
+  background-color: #FEF3C7 !important;
+  border-color: #FCD34D !important;
+  color: #B45309 !important;
+}
+
+html.light-mode .bg-\[\#F59E0B\],
+html.light-mode .bg-amber-400 {
+  background-color: #D97706 !important;
+  color: #FFFFFF !important;
+}
+
+html.light-mode .bg-emerald-500\/10,
+html.light-mode .bg-emerald-500\/15 {
+  background-color: #D1FAE5 !important;
+  border-color: #6EE7B7 !important;
+  color: #047857 !important;
+}
+
+/* Navigation buttons and dark call to actions should be clear dark blue */
+html.light-mode button.bg-black,
+html.light-mode a.bg-black {
+  background-color: #0F172A !important;
+  color: #FFFFFF !important;
+}
+
+/* Mobile dropdown panel */
+html.light-mode div.md\:hidden.bg-slate-950 {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+}
+
+/* Ensure background grids are invisible or very subtle in light mode */
+html.light-mode div.bg-\[linear-gradient\(to_right\,\#111_1px\,transparent_1px\)\,linear-gradient\(to_bottom\,\#111_1px\,transparent_1px\)\] {
+  background-image: linear-gradient(to right, #F1F5F9 1px, transparent 1px), linear-gradient(to bottom, #F1F5F9 1px, transparent 1px) !important;
+}
+
+

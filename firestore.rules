@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default-deny catch-all)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive definitions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity validator helper for WalletProfile
+    function isValidWalletProfile(data) {
+      return data.address is string && data.address.size() >= 10 && data.address.size() <= 128
+        && data.connectedAt is string && data.connectedAt.size() > 0 && data.connectedAt.size() <= 64
+        && data.lastSeen is string && data.lastSeen.size() > 0 && data.lastSeen.size() <= 64
+        && data.verifiedNfts is list && data.verifiedNfts.size() <= 100
+        && data.detectedAlignment is string && data.detectedAlignment.size() <= 32 
+        && (data.detectedAlignment in ['light', 'shadow', 'nexus', 'Light', 'Shadow', 'Nexus'])
+        && data.detectedSeed is string && data.detectedSeed.size() <= 128
+        && data.isEvolved is bool
+        && data.selectedBadge is string && data.selectedBadge.size() <= 64
+        // Optional properties (might or might not be present, so check if they exist or default)
+        && (!('customOverlayImg' in data) || (data.customOverlayImg is string && data.customOverlayImg.size() <= 1048576))
+        && (!('customOverlayName' in data) || (data.customOverlayName is string && data.customOverlayName.size() <= 128))
+        && (!('isCustomApplied' in data) || (data.isCustomApplied is bool));
+    }
+
+    function hasOnlyValidKeys(data) {
+      return data.keys().hasAll(['address', 'connectedAt', 'lastSeen', 'verifiedNfts', 'detectedAlignment', 'detectedSeed', 'isEvolved', 'selectedBadge'])
+        && data.keys().size() <= 11; // Allow optional customOverlayImg, customOverlayName, isCustomApplied
+    }
+
+    // Wallets collection matching
+    match /wallets/{walletId} {
+      allow get: if isValidId(walletId);
+      allow list: if true; // Public feed of scanned wallets
+      allow create: if isValidId(walletId) 
+        && walletId == incoming().address 
+        && isValidWalletProfile(incoming()) 
+        && hasOnlyValidKeys(incoming());
+      allow update: if isValidId(walletId) 
+        && isValidWalletProfile(incoming()) 
+        && incoming().address == existing().address 
+        && incoming().connectedAt == existing().connectedAt
+        && (
+          // Action 1: Update scanned stats & preferences
+          incoming().diff(existing()).affectedKeys().hasOnly(['lastSeen', 'detectedAlignment', 'detectedSeed', 'isEvolved', 'selectedBadge', 'verifiedNfts']) ||
+          // Action 2: Update custom overlay properties
+          incoming().diff(existing()).affectedKeys().hasOnly(['lastSeen', 'customOverlayImg', 'customOverlayName', 'isCustomApplied'])
+        );
+      allow delete: if false; // Deletion is not permitted
+    }
+  }
+}
