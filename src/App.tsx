@@ -754,7 +754,7 @@ export default function App() {
               </blockquote>
 
               <p>
-                Right before this project began, I found myself in a challenging situation with my wife. I had stopped talking to her for a while, letting silence build up between us. But then, she turned around and did the exact same thing back to me.
+                Right before this project began, I found myself in a challenging situation with my wife, Vanessa. I, Matthew, had stopped talking to her for a while, letting silence build up between us. But then, she turned around and did the exact same thing back to me.
               </p>
 
               <p className="font-semibold text-slate-300">
@@ -762,7 +762,7 @@ export default function App() {
               </p>
 
               <p>
-                It was a powerful, immediate lesson in karma: what you put out into the world always finds its way back to you. Since she has always reminded me of a beautiful, delicate butterfly—graceful yet powerful in her presence—this profound personal experience became the spark of inspiration.
+                It was a powerful, immediate lesson in karma: what you put out into the world always finds its way back to you. Since she has always reminded me of a beautiful, delicate butterfly—graceful yet powerful in her presence—this profound personal experience became the spark of inspiration. In fact, her name itself inspired the butterfly: the name <em>Vanessa</em> has no ancient linguistic root; it is a modern literary invention created by Anglo-Irish author Jonathan Swift in 1712, which was later adopted in biology to name a genus of butterflies.
               </p>
 
               <p>
