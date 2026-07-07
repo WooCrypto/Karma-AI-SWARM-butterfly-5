@@ -205,8 +205,6 @@ export default function ProfileOverlay() {
   const [baseImgPanX, setBaseImgPanX] = useState<number>(0);
   const [baseImgPanY, setBaseImgPanY] = useState<number>(0);
 
-  // High performance dynamic preview cache
-  const [compositeDataUrl, setCompositeDataUrl] = useState<string | null>(null);
   const [editMode, setEditMode] = useState<'butterfly' | 'background'>('butterfly');
 
   // Gesture state management
@@ -225,6 +223,171 @@ export default function ProfileOverlay() {
   const [glowColor, setGlowColor] = useState<string>('#F59E0B');
   const [enableGlow, setEnableGlow] = useState<boolean>(true);
   const [keyOutBackground, setKeyOutBackground] = useState<boolean>(false);
+  const [enableSwarmBg, setEnableSwarmBg] = useState<boolean>(false);
+  const [swarmTolerance, setSwarmTolerance] = useState<number>(85); // 10 to 200
+  const [swarmKeyMode, setSwarmKeyMode] = useState<'auto' | 'white' | 'dark' | 'chroma'>('auto');
+  const [swarmChromaColor, setSwarmChromaColor] = useState<string>('#FFFFFF');
+  const [croppedBaseImgUrl, setCroppedBaseImgUrl] = useState<string>('');
+
+  // Effect to dynamically compute the cropped base image with transparent background in the UI
+  useEffect(() => {
+    if (!uploadedBaseImg) {
+      setCroppedBaseImgUrl('');
+      return;
+    }
+
+    if (!keyOutBackground && !enableSwarmBg) {
+      setCroppedBaseImgUrl(uploadedBaseImg);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      // Downscale slightly for extremely fast processing in UI
+      const maxDim = 600;
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.drawImage(img, 0, 0, w, h);
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const data = imgData.data;
+
+      // Sample background colors from 3 top points (top-left, top-middle, top-right)
+      // and skip bottom corners to prevent cropping the person's body/shoulders!
+      const topPoints = [
+        { x: 5, y: 5 },
+        { x: Math.floor(w / 2), y: 5 },
+        { x: w - 6, y: 5 }
+      ];
+
+      const sampledColors: { r: number; g: number; b: number }[] = [];
+      topPoints.forEach(coord => {
+        const idx = (coord.y * w + coord.x) * 4;
+        if (idx < data.length) {
+          const alpha = data[idx + 3];
+          if (alpha > 120) {
+            sampledColors.push({
+              r: data[idx],
+              g: data[idx + 1],
+              b: data[idx + 2]
+            });
+          }
+        }
+      });
+
+      // Convert hex to rgb helper
+      const hexToRgb = (hex: string) => {
+        const cleanHex = hex.replace('#', '');
+        const num = parseInt(cleanHex, 16);
+        return {
+          r: (num >> 16) & 255,
+          g: (num >> 8) & 255,
+          b: num & 255
+        };
+      };
+      const chromaRgb = hexToRgb(swarmChromaColor);
+
+      // Run pixel-by-pixel color matching and filtering
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+
+        if (a === 0) continue;
+
+        let isBgColor = false;
+
+        if (swarmKeyMode === 'auto') {
+          // Check similarity to top background colors
+          for (const sc of sampledColors) {
+            const dist = Math.sqrt(
+              Math.pow(r - sc.r, 2) +
+              Math.pow(g - sc.g, 2) +
+              Math.pow(b - sc.b, 2)
+            );
+            if (dist < swarmTolerance) {
+              isBgColor = true;
+              break;
+            }
+          }
+          // Fallback basic light/dark corner check
+          if (!isBgColor) {
+            const brightness = (r + g + b) / 3;
+            if (brightness > 235 && swarmTolerance > 40) {
+              isBgColor = true;
+            } else if (brightness < 35 && swarmTolerance > 40) {
+              isBgColor = true;
+            }
+          }
+        } else if (swarmKeyMode === 'white') {
+          const brightness = (r + g + b) / 3;
+          if (brightness > (255 - swarmTolerance)) {
+            isBgColor = true;
+          }
+        } else if (swarmKeyMode === 'dark') {
+          const brightness = (r + g + b) / 3;
+          if (brightness < swarmTolerance) {
+            isBgColor = true;
+          }
+        } else if (swarmKeyMode === 'chroma') {
+          const dist = Math.sqrt(
+            Math.pow(r - chromaRgb.r, 2) +
+            Math.pow(g - chromaRgb.g, 2) +
+            Math.pow(b - chromaRgb.b, 2)
+          );
+          if (dist < swarmTolerance) {
+            isBgColor = true;
+          }
+        }
+
+        if (isBgColor) {
+          data[i + 3] = 0; // Transparent
+        }
+      }
+
+      // State-of-the-art Edge Feathering Anti-Aliasing pass
+      const alphaBuffer = new Uint8Array(w * h);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          alphaBuffer[y * w + x] = data[(y * w + x) * 4 + 3];
+        }
+      }
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const idx = (y * w + x) * 4;
+          if (data[idx + 3] > 0) {
+            const aLeft  = alphaBuffer[y * w + (x - 1)];
+            const aRight = alphaBuffer[y * w + (x + 1)];
+            const aUp    = alphaBuffer[(y - 1) * w + x];
+            const aDown  = alphaBuffer[(y + 1) * w + x];
+            if (aLeft === 0 || aRight === 0 || aUp === 0 || aDown === 0) {
+              data[idx + 3] = Math.round(data[idx + 3] * 0.45);
+            }
+          }
+        }
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+      setCroppedBaseImgUrl(canvas.toDataURL('image/png'));
+    };
+    img.src = uploadedBaseImg;
+  }, [uploadedBaseImg, keyOutBackground, enableSwarmBg, swarmKeyMode, swarmTolerance, swarmChromaColor]);
 
   // 3D PFP Ring variables
   const [enablePfpRing, setEnablePfpRing] = useState<boolean>(true);
@@ -246,7 +409,7 @@ export default function ProfileOverlay() {
   // Generation & saving states
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [savedCreations, setSavedCreations] = useState<SavedOverlay[]>([]);
-  const [activeTab, setActiveTab] = useState<'editor' | 'library'>('editor');
+  const [activeTab, setActiveTab] = useState<'editor' | 'swarm' | 'library'>('editor');
   const [socialModalPreset, setSocialModalPreset] = useState<{
     open: boolean;
     dataUrl: string | null;
@@ -464,7 +627,7 @@ export default function ProfileOverlay() {
 
     try {
       // 1. Load background if image mode is active and we have an image
-      const useBgImage = uploadedBaseImg && bgType === 'image';
+      const useBgImage = uploadedBaseImg && (bgType === 'image' || enableSwarmBg);
       const baseImg = new Image();
       
       if (useBgImage && uploadedBaseImg) {
@@ -508,53 +671,181 @@ export default function ProfileOverlay() {
       ctx.imageSmoothingQuality = 'high';
 
       // 4. Draw profile background
-      if (useBgImage) {
-        ctx.save();
-        const zoom = baseImgZoom;
-        const panX = (baseImgPanX / 100) * canvas.width;
-        const panY = (baseImgPanY / 100) * canvas.height;
-
-        // Draw it to fill the targetSize square while preserving the aspect ratio perfectly (no squishing/stretching)
-        const imgRatio = baseImg.naturalWidth / baseImg.naturalHeight;
-        let drawW = canvas.width;
-        let drawH = canvas.height;
-        if (imgRatio > 1) {
-          drawW = canvas.height * imgRatio;
-        } else {
-          drawH = canvas.width / imgRatio;
-        }
-
-        const w = drawW * zoom;
-        const h = drawH * zoom;
-        const x = (canvas.width - w) / 2 + panX;
-        const y = (canvas.height - h) / 2 + panY;
-
-        ctx.drawImage(baseImg, x, y, w, h);
-        ctx.restore();
-
-        // Apply key out background effect if requested
-        if (keyOutBackground) {
-          // Simple canvas chroma key filter to make white backgrounds of the uploaded image transparent
-          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imgData.data;
-          for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i+1];
-            const b = data[i+2];
-            // If close to absolute white, make it transparent
-            if (r > 240 && g > 240 && b > 240) {
-              data[i+3] = 0; // zero alpha
-            }
-          }
-          ctx.putImageData(imgData, 0, 0);
-        }
+      if (enableSwarmBg) {
+        // Draw solid SWARM Orange background
+        ctx.fillStyle = '#F59E0B';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       } else if (bgType === 'dark') {
         // Draw solid dark background
         ctx.fillStyle = '#070708';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else {
+      } else if (bgType === 'transparent') {
         // Transparent background
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+      if (useBgImage) {
+        // Create an offscreen canvas to process and key out the base image
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+
+        if (tempCtx) {
+          tempCtx.imageSmoothingEnabled = true;
+          tempCtx.imageSmoothingQuality = 'high';
+
+          const zoom = baseImgZoom;
+          const panX = (baseImgPanX / 100) * canvas.width;
+          const panY = (baseImgPanY / 100) * canvas.height;
+
+          // Draw to fill the square while preserving aspect ratio
+          const imgRatio = baseImg.naturalWidth / baseImg.naturalHeight;
+          let drawW = canvas.width;
+          let drawH = canvas.height;
+          if (imgRatio > 1) {
+            drawW = canvas.height * imgRatio;
+          } else {
+            drawH = canvas.width / imgRatio;
+          }
+
+          const w = drawW * zoom;
+          const h = drawH * zoom;
+          const x = (canvas.width - w) / 2 + panX;
+          const y = (canvas.height - h) / 2 + panY;
+
+          tempCtx.drawImage(baseImg, x, y, w, h);
+
+          // Apply intelligent key-out background effect if requested or if Swarm mode is active
+          if (keyOutBackground || enableSwarmBg) {
+            const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imgData.data;
+
+            // Sample background colors from top edge points to intelligently detect backdrop
+            // (Avoiding bottom corners to protect person's clothes / shoulders!)
+            const corners = [
+              { x: 5, y: 5 },
+              { x: Math.floor(tempCanvas.width / 2), y: 5 },
+              { x: tempCanvas.width - 6, y: 5 }
+            ];
+
+            const sampledColors: { r: number; g: number; b: number }[] = [];
+            corners.forEach(coord => {
+              const idx = (coord.y * tempCanvas.width + coord.x) * 4;
+              if (idx < data.length) {
+                const alpha = data[idx + 3];
+                // Only sample if solid/mostly solid (avoid sampling pre-transparent zones)
+                if (alpha > 120) {
+                  sampledColors.push({
+                    r: data[idx],
+                    g: data[idx + 1],
+                    b: data[idx + 2]
+                  });
+                }
+              }
+            });
+
+            // Convert hex to rgb helper
+            const hexToRgb = (hex: string) => {
+              const cleanHex = hex.replace('#', '');
+              const num = parseInt(cleanHex, 16);
+              return {
+                r: (num >> 16) & 255,
+                g: (num >> 8) & 255,
+                b: num & 255
+              };
+            };
+            const chromaRgb = hexToRgb(swarmChromaColor);
+
+            // Run pixel-by-pixel color matching and filtering
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              const a = data[i + 3];
+
+              if (a === 0) continue;
+
+              let isBgColor = false;
+
+              if (swarmKeyMode === 'auto') {
+                // 1. Check similarity to corner background colors
+                for (const sc of sampledColors) {
+                  const dist = Math.sqrt(
+                    Math.pow(r - sc.r, 2) +
+                    Math.pow(g - sc.g, 2) +
+                    Math.pow(b - sc.b, 2)
+                  );
+                  if (dist < swarmTolerance) {
+                    isBgColor = true;
+                    break;
+                  }
+                }
+                // Fallback basic light/dark corner check
+                if (!isBgColor) {
+                  const brightness = (r + g + b) / 3;
+                  if (brightness > 235 && swarmTolerance > 40) {
+                    isBgColor = true;
+                  } else if (brightness < 35 && swarmTolerance > 40) {
+                    isBgColor = true;
+                  }
+                }
+              } else if (swarmKeyMode === 'white') {
+                const brightness = (r + g + b) / 3;
+                if (brightness > (255 - swarmTolerance)) {
+                  isBgColor = true;
+                }
+              } else if (swarmKeyMode === 'dark') {
+                const brightness = (r + g + b) / 3;
+                if (brightness < swarmTolerance) {
+                  isBgColor = true;
+                }
+              } else if (swarmKeyMode === 'chroma') {
+                const dist = Math.sqrt(
+                  Math.pow(r - chromaRgb.r, 2) +
+                  Math.pow(g - chromaRgb.g, 2) +
+                  Math.pow(b - chromaRgb.b, 2)
+                );
+                if (dist < swarmTolerance) {
+                  isBgColor = true;
+                }
+              }
+
+              if (isBgColor) {
+                data[i + 3] = 0; // Set alpha to 0 (cropped out!)
+              }
+            }
+
+            // State-of-the-art Edge Feathering Anti-Aliasing pass
+            const compW = tempCanvas.width;
+            const compH = tempCanvas.height;
+            const alphaBuffer = new Uint8Array(compW * compH);
+            for (let y = 0; y < compH; y++) {
+              for (let x = 0; x < compW; x++) {
+                alphaBuffer[y * compW + x] = data[(y * compW + x) * 4 + 3];
+              }
+            }
+            for (let y = 1; y < compH - 1; y++) {
+              for (let x = 1; x < compW - 1; x++) {
+                const idx = (y * compW + x) * 4;
+                if (data[idx + 3] > 0) {
+                  const aLeft  = alphaBuffer[y * compW + (x - 1)];
+                  const aRight = alphaBuffer[y * compW + (x + 1)];
+                  const aUp    = alphaBuffer[(y - 1) * compW + x];
+                  const aDown  = alphaBuffer[(y + 1) * compW + x];
+                  if (aLeft === 0 || aRight === 0 || aUp === 0 || aDown === 0) {
+                    data[idx + 3] = Math.round(data[idx + 3] * 0.45);
+                  }
+                }
+              }
+            }
+
+            tempCtx.putImageData(imgData, 0, 0);
+          }
+
+          // Composite the cropped/keyed image onto the main canvas
+          ctx.drawImage(tempCanvas, 0, 0);
+        }
       }
 
       // Draw 3D glowing PFP ring if enabled
@@ -843,45 +1134,6 @@ export default function ProfileOverlay() {
     }
   };
 
-  // Effect to dynamically compile the high-fidelity merged composition image
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      try {
-        const dataUrl = await generateSocialComposition();
-        if (dataUrl) {
-          setCompositeDataUrl(dataUrl);
-        }
-      } catch (err) {
-        console.error("Auto composition compilation failed", err);
-      }
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [
-    uploadedBaseImg,
-    bgType,
-    overlayScale,
-    offsetX,
-    offsetY,
-    rotation,
-    glowSize,
-    glowColor,
-    enableGlow,
-    keyOutBackground,
-    selectedBadge,
-    detectedAlignment,
-    detectedSeed,
-    isEvolved,
-    baseImgZoom,
-    baseImgPanX,
-    baseImgPanY,
-    enablePfpRing,
-    pfpRingColor,
-    pfpRingThickness,
-    pfpRingGlow,
-    pfpRingDiameter
-  ]);
-
   // Gestures and interactions
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     const isButterfly = (e.target as HTMLElement).closest('#butterfly-overlay') !== null;
@@ -1138,6 +1390,7 @@ export default function ProfileOverlay() {
     setPfpRingThickness(12);
     setPfpRingGlow(15);
     setPfpRingDiameter(92);
+    setEnableSwarmBg(false);
   };
 
   const removeSavedCreation = (id: string, e: MouseEvent) => {
@@ -1186,19 +1439,40 @@ export default function ProfileOverlay() {
           </div>
 
           {/* Tab Selection */}
-          <div className="flex bg-[#161617] border border-white/5 p-1 rounded-xl shrink-0 self-start md:self-auto">
+          <div className="flex bg-[#161617] border border-white/5 p-1 rounded-xl shrink-0 self-start md:self-auto gap-1">
             <button
-              onClick={() => setActiveTab('editor')}
+              onClick={() => {
+                setActiveTab('editor');
+                setEnableSwarmBg(false);
+              }}
               className={`px-4 py-1.5 rounded-lg text-xs font-sans font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === 'editor' 
                   ? 'bg-[#F59E0B] text-black shadow' 
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Floating SWARM X Badge Generator
+              Badge Generator
             </button>
             <button
-              onClick={() => setActiveTab('library')}
+              onClick={() => {
+                setActiveTab('swarm');
+                setEnableSwarmBg(true); // Auto-activate swarm background mode when clicking the tab
+                setKeyOutBackground(true);
+              }}
+              className={`px-4 py-1.5 rounded-lg text-xs font-sans font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'swarm' 
+                  ? 'bg-[#F59E0B] text-black shadow' 
+                  : 'text-slate-400 hover:text-[#F59E0B]'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5" />
+              <span>SWARM Theme</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('library');
+                setEnableSwarmBg(false);
+              }}
               className={`px-4 py-1.5 rounded-lg text-xs font-sans font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'library' 
                   ? 'bg-[#F59E0B] text-black shadow' 
@@ -1217,7 +1491,7 @@ export default function ProfileOverlay() {
           </div>
         </div>
 
-        {activeTab === 'editor' ? (
+        {activeTab === 'editor' || activeTab === 'swarm' ? (
           
           /* Editor Tab Layout grid */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -1356,14 +1630,16 @@ export default function ProfileOverlay() {
                   onTouchEnd={handleTouchEnd}
                   onWheel={handleWheel}
                   className={`relative w-full max-w-[340px] md:max-w-[400px] aspect-square rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center overflow-hidden shadow-inner transition-all select-none ${
-                    bgType === 'transparent'
+                    enableSwarmBg
+                      ? 'bg-[#F59E0B]'
+                      : bgType === 'transparent'
                       ? 'bg-[linear-gradient(45deg,#161617_25%,transparent_25%),linear-gradient(-45deg,#161617_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#161617_75%),linear-gradient(-45deg,transparent_75%,#161617_75%)] bg-[size:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0] bg-[#070708]'
                       : bgType === 'dark'
                       ? 'bg-[#0B0B0C]'
                       : 'bg-[#070708]'
                   }`}
                 >
-                  {bgType === 'image' && !uploadedBaseImg ? (
+                  {(bgType === 'image' || enableSwarmBg) && !uploadedBaseImg ? (
                     <div className="text-center p-8 space-y-4">
                       <div className="w-16 h-16 rounded-2xl bg-amber-500/5 border border-[#F59E0B]/20 flex items-center justify-center text-4xl mx-auto animate-bounce duration-1000">
                         📸
@@ -1385,7 +1661,7 @@ export default function ProfileOverlay() {
                     <div className="relative w-full h-full flex items-center justify-center overflow-hidden rounded-xl">
                       
                       {/* Base Image */}
-                      {bgType === 'image' && uploadedBaseImg && (
+                      {(bgType === 'image' || enableSwarmBg) && uploadedBaseImg && (
                         <div 
                           className="w-full h-full transition-transform duration-75 pointer-events-none"
                           style={{
@@ -1393,11 +1669,9 @@ export default function ProfileOverlay() {
                           }}
                         >
                           <img 
-                            src={uploadedBaseImg} 
+                            src={croppedBaseImgUrl || uploadedBaseImg} 
                             alt="Workspace Base" 
-                            className={`w-full h-full object-cover rounded-xl ${
-                              keyOutBackground ? 'bg-slate-900 shadow-xl' : ''
-                            }`} 
+                            className="w-full h-full object-cover rounded-xl" 
                           />
                         </div>
                       )}
@@ -1467,7 +1741,7 @@ export default function ProfileOverlay() {
                       )}
 
                       {/* Tap to save composite hover-overlay */}
-                      {compositeDataUrl && !isPanning && (
+                      {uploadedBaseImg && !isPanning && (
                         <div 
                           onClick={handleDownload}
                           className="absolute inset-0 w-full h-full cursor-pointer z-20 group"
@@ -1489,7 +1763,7 @@ export default function ProfileOverlay() {
                 <div className="w-full mt-6 space-y-3 pt-4 border-t border-white/5">
                   <div className="flex flex-col sm:flex-row gap-3 w-full">
                     <button
-                      disabled={isGenerating || (bgType === 'image' && !uploadedBaseImg)}
+                      disabled={isGenerating || ((bgType === 'image' || enableSwarmBg) && !uploadedBaseImg)}
                       onClick={handleDownload}
                       className="flex-1 py-3 bg-[#F59E0B] disabled:bg-amber-500/10 disabled:text-slate-500 disabled:cursor-not-allowed text-black rounded-xl text-xs font-sans font-black uppercase tracking-widest flex items-center justify-center gap-1.5 hover:scale-[1.01] transition-all cursor-pointer shadow-lg shadow-amber-500/10 font-extrabold"
                     >
@@ -1507,7 +1781,7 @@ export default function ProfileOverlay() {
                     </button>
                   </div>
 
-                  {(uploadedBaseImg || bgType !== 'image') && (
+                  {(uploadedBaseImg || (bgType !== 'image' && !enableSwarmBg)) && (
                     <div className="space-y-2">
                       <span className="text-[8.5px] font-mono text-slate-500 uppercase tracking-widest block text-center">Export Custom Platform Crop Size presets:</span>
                       <div className="grid grid-cols-4 gap-2 text-center text-[9px] font-mono text-slate-300">
@@ -1545,6 +1819,7 @@ export default function ProfileOverlay() {
             </div>
 
             {/* Box 3: Overlay Controllers & badging */}
+            {activeTab === 'editor' ? (
               <div className="col-span-12 lg:col-span-5 bg-[#111111]/90 border border-white/10 rounded-2xl p-5 space-y-4">
                 <div className="flex items-center justify-between border-b border-white/5 pb-3">
                   <h3 className="text-xs font-mono font-extrabold uppercase text-[#F59E0B] tracking-wider flex items-center gap-1.5">
@@ -1957,7 +2232,222 @@ export default function ProfileOverlay() {
                 </div>
 
               </div>
+            ) : (
+              /* Box 3: SWARM Theme Controls */
+              <div className="col-span-12 lg:col-span-5 bg-[#111111]/90 border border-amber-500/25 rounded-2xl p-5 space-y-6">
+                <div className="border-b border-white/5 pb-3">
+                  <span className="text-[10px] font-mono text-[#F59E0B] uppercase tracking-[0.15em] font-extrabold flex items-center gap-1.5 mb-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-ping" />
+                    <span>SWARM CAMPAIGN</span>
+                  </span>
+                  <h3 className="text-sm font-sans font-black text-white tracking-tight">
+                    SWARM Orange Background Tool
+                  </h3>
+                  <p className="text-slate-400 text-[11px] mt-1.5 leading-relaxed">
+                    Convert any profile image or uploaded NFT into an official orange SWARM campaign PFP. This tool fills the background with the vibrant orange branding, keys out solid white or light backdrops, and layers your unique Karma Butterfly badge beautifully.
+                  </p>
+                </div>
 
+                {/* SWARM Toggle Card */}
+                <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-white block">SWARM Background Color</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">Toggle solid brand orange</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const nextVal = !enableSwarmBg;
+                        setEnableSwarmBg(nextVal);
+                        if (nextVal) {
+                          // Automatically set up best settings for swarm mode
+                          setKeyOutBackground(true);
+                          setPfpRingColor('#FFFFFF'); // white contrast ring
+                          setSelectedBadge('holder');
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-250 ease-in-out focus:outline-none ${
+                        enableSwarmBg ? 'bg-[#F59E0B]' : 'bg-[#222223]'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-250 ease-in-out ${
+                          enableSwarmBg ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-black/40 p-2.5 rounded-lg border border-white/5">
+                    <div className="w-5 h-5 rounded bg-[#F59E0B] shrink-0 border border-white/10" />
+                    <div className="text-[10px] font-mono text-slate-300">
+                      Active Shade: <span className="text-[#F59E0B] font-bold">#F59E0B (Swarm Orange)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Intelligent Key out settings for PFP/NFT */}
+                <div className="space-y-4">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block font-bold">INTELLIGENT BACKGROUND CROPPING</span>
+                  
+                  <div className="bg-black/25 p-4 rounded-xl border border-white/5 space-y-4">
+                    {/* Toggle Backdrop Crop */}
+                    <div className="flex items-center justify-between pb-3 border-b border-white/5">
+                      <div>
+                        <span className="text-xs font-bold text-white block">Backdrop Removal</span>
+                        <span className="text-[9.5px] text-slate-400 block mt-0.5">Crop original background out</span>
+                      </div>
+                      <button
+                        onClick={() => setKeyOutBackground(!keyOutBackground)}
+                        className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-250 ease-in-out focus:outline-none ${
+                          keyOutBackground ? 'bg-[#F59E0B]' : 'bg-[#222223]'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-250 ease-in-out ${
+                            keyOutBackground ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {keyOutBackground && (
+                      <div className="space-y-4 pt-1">
+                        {/* 1. Backdrop Crop Mode */}
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Crop Detection Mode</span>
+                          <div className="grid grid-cols-2 gap-1.5 text-xs">
+                            {[
+                              { id: 'auto', label: '🪄 Auto Corner' },
+                              { id: 'white', label: '⚪ Crop White' },
+                              { id: 'dark', label: '⚫ Crop Dark' },
+                              { id: 'chroma', label: '🎨 Color Picker' },
+                            ].map(mode => (
+                              <button
+                                key={mode.id}
+                                onClick={() => setSwarmKeyMode(mode.id as any)}
+                                className={`py-2 px-2.5 rounded-lg border text-left font-sans font-bold text-[9.5px] uppercase tracking-wider transition cursor-pointer ${
+                                  swarmKeyMode === mode.id 
+                                    ? 'bg-neutral-800 border-[#F59E0B]/50 text-[#F59E0B]' 
+                                    : 'bg-black/20 border-white/5 text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                {mode.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* 2. Custom Chroma color picker */}
+                        {swarmKeyMode === 'chroma' && (
+                          <div className="space-y-2 bg-black/40 p-3 rounded-lg border border-white/5">
+                            <span className="text-[9.5px] font-mono text-slate-400 uppercase tracking-wider block">Target Background Color</span>
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="color"
+                                value={swarmChromaColor}
+                                onChange={(e) => setSwarmChromaColor(e.target.value)}
+                                className="w-8 h-8 rounded border border-white/10 bg-transparent cursor-pointer"
+                              />
+                              <div className="flex-1">
+                                <input
+                                  type="text"
+                                  value={swarmChromaColor}
+                                  onChange={(e) => setSwarmChromaColor(e.target.value)}
+                                  className="w-full bg-black/35 border border-white/5 rounded px-2.5 py-1 text-xs text-white font-mono uppercase"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-1 pt-1.5 overflow-x-auto">
+                              {['#FFFFFF', '#000000', '#00FF00', '#0000FF', '#CCCCCC'].map(preset => (
+                                <button
+                                  key={preset}
+                                  onClick={() => setSwarmChromaColor(preset)}
+                                  className={`px-2 py-0.5 text-[8.5px] font-mono rounded border ${
+                                    swarmChromaColor.toUpperCase() === preset.toUpperCase()
+                                      ? 'bg-neutral-800 border-white/40 text-white'
+                                      : 'bg-black/20 border-white/5 text-slate-500 hover:text-slate-300'
+                                  }`}
+                                >
+                                  {preset === '#FFFFFF' ? 'White' : preset === '#000000' ? 'Black' : preset === '#00FF00' ? 'Green' : preset === '#0000FF' ? 'Blue' : 'Grey'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 3. Crop Intensity (Tolerance) Slider */}
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-[10px] font-mono">
+                            <span className="text-slate-400 uppercase">Crop Sensitivity (Tolerance)</span>
+                            <span className="text-[#F59E0B] font-bold">{swarmTolerance}</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="5"
+                            max={swarmKeyMode === 'white' || swarmKeyMode === 'dark' ? "250" : "180"}
+                            value={swarmTolerance}
+                            onChange={(e) => setSwarmTolerance(parseInt(e.target.value))}
+                            className="w-full accent-[#F59E0B] cursor-pointer h-1 bg-[#1A1A1A] rounded-lg"
+                          />
+                          <p className="text-[9px] text-slate-500 font-mono leading-tight pt-1">
+                            {swarmKeyMode === 'auto' && "Increase to remove background shades similar to the corners. Decrease to preserve details."}
+                            {swarmKeyMode === 'white' && "Higher sensitivity cuts out darker shades of white and light greys."}
+                            {swarmKeyMode === 'dark' && "Higher sensitivity cuts out lighter shades of black and dark greys."}
+                            {swarmKeyMode === 'chroma' && "Adjust similarity check for custom backdrop color."}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Ring color selector specifically styled for Swarm */}
+                  <div className="space-y-2 bg-[#1A1A1A]/40 p-3 rounded-xl border border-white/5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-300 flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={enablePfpRing}
+                          onChange={(e) => setEnablePfpRing(e.target.checked)}
+                          className="rounded border-white/10 text-[#F59E0B] focus:ring-0 cursor-pointer"
+                        />
+                        <span>Glowing Ring Framing</span>
+                      </label>
+                      {enablePfpRing && (
+                        <div 
+                          className="w-3.5 h-3.5 rounded-full border border-white/20"
+                          style={{ backgroundColor: pfpRingColor }}
+                        />
+                      )}
+                    </div>
+                    {enablePfpRing && (
+                      <div className="grid grid-cols-5 gap-1.5 pt-1.5">
+                        {['#FFFFFF', '#F59E0B', '#000000', '#fb923c', '#34d399'].map(c => (
+                          <button
+                            key={c}
+                            onClick={() => setPfpRingColor(c)}
+                            className={`py-1 text-[9px] font-mono rounded border text-center font-bold uppercase transition cursor-pointer ${
+                              pfpRingColor === c ? 'bg-neutral-800 border-white/50 text-white' : 'bg-black/20 border-white/5 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {c === '#FFFFFF' ? 'White' : c === '#F59E0B' ? 'Orange' : c === '#000000' ? 'Black' : c === '#fb923c' ? 'Amber' : 'Teal'}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Easy Quick Actions info */}
+                <div className="text-[10px] font-mono text-slate-500 leading-relaxed bg-[#1A1A1A]/40 p-3 rounded-xl border border-white/5">
+                  <span className="text-[#F59E0B] font-bold block mb-1">💡 QUICK WORKFLOW:</span>
+                  1. Go to the "Attach Canvas File" panel on the left.<br />
+                  2. Upload your current profile picture, avatar, or NFT.<br />
+                  3. Turn on the "SWARM Background Color" toggle.<br />
+                  4. Your avatar background turns orange! Adjust positioning and download!
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           /* Creations Library Tab */

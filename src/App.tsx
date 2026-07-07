@@ -5,7 +5,7 @@ import SwarmTerminal from './components/SwarmTerminal';
 import ProfileOverlay from './components/ProfileOverlay';
 import KarmaGamezAd from './components/KarmaGamezAd';
 import FAQ from './components/FAQ';
-import { ArrowDown, Flame, ShieldAlert, Sparkles, Network, BookOpen, X, Heart, ExternalLink, Zap, Globe, Twitter, Link, Check, Share2, Send, Lock, MessageSquare } from 'lucide-react';
+import { ArrowDown, Flame, ShieldAlert, Sparkles, Network, BookOpen, X, Heart, ExternalLink, Zap, Globe, Twitter, Link, Check, Share2, Send, Lock, MessageSquare, Trophy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -205,7 +205,7 @@ export default function App() {
                 <h1 className="text-xl font-display font-black tracking-tight text-white leading-none uppercase">
                   KARMA BUTTERFLIES
                 </h1>
-                <span className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest block mt-1">
+                <span className="text-xs sm:text-[13px] font-mono font-black text-slate-500 uppercase tracking-widest block mt-1">
                   REPUTATION CREDENTIALS
                 </span>
               </div>
@@ -219,7 +219,7 @@ export default function App() {
               >
                 Welcome Home, Anonymous Swarm.
                 {isWelcomeExpanded && (
-                  <span className="text-[10px] font-mono text-slate-500 lowercase ml-2 font-normal animate-pulse">
+                  <span className="text-xs font-mono text-slate-500 lowercase ml-2 font-normal animate-pulse">
                     (click to close ×)
                   </span>
                 )}
@@ -234,10 +234,10 @@ export default function App() {
                     transition={{ duration: 0.3, ease: 'easeInOut' }}
                     className="overflow-hidden space-y-4"
                   >
-                    <p className="text-slate-300 text-xs sm:text-sm leading-relaxed font-semibold">
+                    <p className="text-slate-300 text-sm sm:text-base leading-relaxed font-semibold">
                       Whether you're a developer, marketer, project manager, reply guy, alpha caller, trader, or absolute beginner—Karma Butterflies is built for <span className="text-[#F59E0B] font-extrabold">YOU</span>.
                     </p>
-                    <p className="text-slate-400 text-xs sm:text-[13px] leading-relaxed font-sans font-medium">
+                    <p className="text-slate-400 text-sm sm:text-[15px] leading-relaxed font-sans font-medium">
                       We're a community united to uplift high-integrity projects, support builders, expose bad actors, and ensure everyday contributors get rewarded. No gatekeeping, no insider privilege—just fair, merit-based karma.
                     </p>
                   </motion.div>
@@ -248,7 +248,7 @@ export default function App() {
             <button
               onClick={() => { if (!isWelcomeExpanded) setIsWelcomeExpanded(true); }}
               disabled={isWelcomeExpanded}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-orange-950/20 border border-[#F59E0B]/25 text-[10px] font-mono font-black text-[#F59E0B] tracking-wider uppercase self-start shadow-md shadow-amber-500/5 transition-all ${
+              className={`inline-flex items-center gap-2 px-4.5 py-3 rounded-xl bg-orange-950/20 border border-[#F59E0B]/25 text-[12px] sm:text-[13px] font-mono font-black text-[#F59E0B] tracking-wider uppercase self-start shadow-md shadow-amber-500/5 transition-all ${
                 !isWelcomeExpanded 
                   ? 'hover:scale-102 hover:bg-orange-950/40 cursor-pointer' 
                   : 'opacity-60 cursor-default'
@@ -262,13 +262,13 @@ export default function App() {
           {/* Bento Box 2: Hero Brand Focal Panel (Stunning Gold backing) */}
           <div className="lg:col-span-7 bg-[#F59E0B] text-black border border-white/10 rounded-3xl p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
             <div className="mb-8">
-              <span className="text-[10px] font-mono font-extrabold uppercase tracking-widest text-black/60 block mb-2">
+              <span className="text-xs sm:text-[13px] font-mono font-extrabold uppercase tracking-widest text-black/60 block mb-2">
                 Concept Release
               </span>
               <h2 className="text-4xl sm:text-5xl lg:text-6xl font-display font-black leading-[0.95] tracking-tighter text-black">
                 YOUR WALLET<br />TELLS A STORY.
               </h2>
-              <p className="text-sm sm:text-base font-semibold leading-relaxed text-black/80 mt-4 max-w-lg">
+              <p className="text-base sm:text-lg font-bold leading-relaxed text-black/90 mt-4 max-w-xl">
                 Every action leaves a wingbeat. Transform on-chain reputational footprint history into legacy. We are not just generative art—we are a belief system.
               </p>
             </div>
@@ -276,21 +276,21 @@ export default function App() {
             <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-6">
               <button
                 onClick={scrollToAnalyzer}
-                className="px-6 py-3 bg-black text-white hover:bg-neutral-900 rounded-full font-sans font-bold text-xs tracking-wider uppercase transition shadow-md active:scale-97 cursor-pointer text-center whitespace-nowrap"
+                className="px-7 py-3.5 bg-black text-white hover:bg-neutral-900 rounded-full font-sans font-bold text-sm tracking-wider uppercase transition shadow-md active:scale-97 cursor-pointer text-center whitespace-nowrap"
               >
                 Check Karma Score
               </button>
 
               <a
                 href="#staking"
-                className="px-6 py-3 bg-neutral-950 text-emerald-400 hover:text-emerald-300 hover:bg-black rounded-full font-sans font-black text-xs tracking-wider uppercase transition-all shadow-md active:scale-97 text-center whitespace-nowrap inline-flex items-center gap-2 border border-emerald-500/20"
+                className="px-7 py-3.5 bg-neutral-950 text-emerald-400 hover:text-emerald-300 hover:bg-black rounded-full font-sans font-black text-sm tracking-wider uppercase transition-all shadow-md active:scale-97 text-center whitespace-nowrap inline-flex items-center gap-2 border border-emerald-500/20"
               >
                 <span>Earn Karma Power Tokens Free 🪙</span>
               </a>
 
               <button
                 onClick={scrollToOverlay}
-                className="px-6 py-3 bg-neutral-950 text-amber-400 hover:text-white hover:bg-black rounded-full font-sans font-black text-xs tracking-wider uppercase transition-all shadow-md active:scale-97 cursor-pointer text-center whitespace-nowrap inline-flex items-center gap-1.5 border border-neutral-900"
+                className="px-7 py-3.5 bg-neutral-950 text-amber-400 hover:text-white hover:bg-black rounded-full font-sans font-black text-sm tracking-wider uppercase transition-all shadow-md active:scale-97 cursor-pointer text-center whitespace-nowrap inline-flex items-center gap-1.5 border border-neutral-900"
               >
                 <span>Floating SWARM X Badge</span>
                 <span className="text-xs">📸</span>
@@ -300,7 +300,7 @@ export default function App() {
                 href="https://gravemint.io/mint/FXSVHzLvVFey57U8ETuhHzrzDRT3FhvqzbxWpyoAJA4c"
                 target="_blank"
                 rel="noreferrer"
-                className="px-6 py-3 bg-white text-black hover:bg-neutral-100 rounded-full font-sans font-black text-xs tracking-wider uppercase transition shadow-md active:scale-97 text-center whitespace-nowrap inline-flex items-center gap-2 border border-black/15 shadow-black/10"
+                className="px-7 py-3.5 bg-white text-black hover:bg-neutral-100 rounded-full font-sans font-black text-sm tracking-wider uppercase transition shadow-md active:scale-97 text-center whitespace-nowrap inline-flex items-center gap-2 border border-black/15 shadow-black/10"
               >
                 <span>Mint Butterflies Now</span>
                 <span className="text-xs">↗</span>
@@ -314,15 +314,15 @@ export default function App() {
 
           {/* Bento Box 3: Generative Art Display */}
           <div className="lg:col-span-4 bg-gradient-to-b from-[#111111] to-[#050505] border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-between min-h-[300px]">
-            <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest self-start">
+            <span className="text-xs font-mono font-bold text-gray-500 uppercase tracking-widest self-start">
               Art Preview • Nexus Seed
             </span>
             <div className="my-4 animate-pulse-glow">
               <SvgButterfly variant="nexus" size={170} flappingSpeed="slow" seed="bento-home-core" />
             </div>
             <div className="text-center">
-              <p className="text-xs font-bold text-gray-400">Generative Butterfly Nexus</p>
-              <span className="text-[9px] font-mono text-gray-600 block mt-1">
+              <p className="text-sm font-bold text-gray-400">Generative Butterfly Nexus</p>
+              <span className="text-[11px] font-mono text-gray-600 block mt-1">
                 procedural canvas engine
               </span>
             </div>
@@ -337,15 +337,15 @@ export default function App() {
                   isNftSectionExpanded ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''
                 }`}
               >
-                <span className="text-xs font-mono text-gray-550 uppercase tracking-widest font-bold">
+                <span className="text-sm font-mono text-gray-400 uppercase tracking-widest font-bold">
                   Ecosystem Alignment
                   {isNftSectionExpanded && (
-                    <span className="text-[10px] font-mono text-slate-500 lowercase ml-2 font-normal animate-pulse">
+                    <span className="text-xs font-mono text-slate-500 lowercase ml-2 font-normal animate-pulse">
                       (click to close ×)
                     </span>
                   )}
                 </span>
-                <span className="text-[10px] bg-amber-500/15 px-2.5 py-0.5 rounded border border-[#F59E0B]/20 text-[#F59E0B] font-mono font-bold">
+                <span className="text-xs sm:text-sm bg-amber-500/15 px-3 py-1 rounded border border-[#F59E0B]/20 text-[#F59E0B] font-mono font-bold">
                   🦋 NFTs WITH A PURPOSE
                 </span>
               </div>
@@ -361,32 +361,32 @@ export default function App() {
                       className="overflow-hidden space-y-6"
                     >
                       <div>
-                        <span className="font-mono text-slate-500 text-[10px] uppercase tracking-wider block mb-1">WHO WE ARE</span>
-                        <h3 className="text-xl sm:text-2xl font-sans font-black text-white tracking-tight leading-snug">
+                        <span className="font-mono text-slate-500 text-xs uppercase tracking-wider block mb-1">WHO WE ARE</span>
+                        <h3 className="text-2xl sm:text-3xl font-sans font-black text-white tracking-tight leading-snug">
                           Karma Butterflies NFTs are for builders, creators, token creators, traders, marketers, communities but most of all believers in a better crypto space.
                         </h3>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                         <div className="space-y-4 bg-black/40 border border-white/5 p-5 rounded-2xl">
-                          <span className="font-mono text-[#F59E0B] text-[10px] uppercase tracking-widest block font-extrabold">Ecosystem Family</span>
-                          <p className="text-xs sm:text-sm leading-relaxed text-slate-300 font-medium">
+                          <span className="font-mono text-[#F59E0B] text-xs uppercase tracking-widest block font-extrabold">Ecosystem Family</span>
+                          <p className="text-sm sm:text-base leading-relaxed text-slate-300 font-medium">
                             Whether you’re a developer, marketer, project manager, community member, reply guy, trader, educator, or someone looking to learn, Karma Butterflies brings together people with different skills and experiences under one community.
                           </p>
                         </div>
 
                         <div className="space-y-4 bg-gradient-to-br from-amber-500/5 to-transparent border border-amber-500/15 p-5 rounded-2xl flex flex-col justify-between">
                           <div className="space-y-2">
-                            <span className="font-mono text-emerald-400 text-[10px] uppercase tracking-widest block font-extrabold">Our Mission</span>
-                            <p className="text-xs sm:text-sm leading-relaxed text-slate-300 font-medium">
+                            <span className="font-mono text-emerald-400 text-xs uppercase tracking-widest block font-extrabold">Our Mission</span>
+                            <p className="text-sm sm:text-base leading-relaxed text-slate-300 font-medium">
                               Our mission is to uplift promising projects, support builders, educate newcomers, create meaningful connections, and help expose bad actors who harm the crypto ecosystem.
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="pt-4 border-t border-white/5 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
-                        <span className="text-slate-550">
+                      <div className="pt-4 border-t border-white/5 flex flex-wrap items-center justify-between gap-4 text-sm font-mono">
+                        <span className="text-slate-450">
                           Status: Connecting skills to real-world impacts
                         </span>
                         <span className="text-[#F59E0B] font-black">
@@ -400,7 +400,7 @@ export default function App() {
                 <button
                   onClick={() => { if (!isNftSectionExpanded) setIsNftSectionExpanded(true); }}
                   disabled={isNftSectionExpanded}
-                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-[#F59E0B]/20 text-[10px] font-mono font-black text-[#F59E0B] tracking-wider uppercase self-start shadow-md shadow-amber-500/5 transition-all ${
+                  className={`inline-flex items-center gap-2 px-4.5 py-3 rounded-xl bg-amber-500/10 border border-[#F59E0B]/20 text-xs font-mono font-black text-[#F59E0B] tracking-wider uppercase self-start shadow-md shadow-amber-500/5 transition-all ${
                     !isNftSectionExpanded 
                       ? 'hover:scale-102 hover:bg-amber-500/20 cursor-pointer' 
                       : 'opacity-60 cursor-default'
@@ -1015,7 +1015,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-[#111111]/95 backdrop-blur-md border border-[#F59E0B]/40 p-5 rounded-2xl shadow-[0_10px_40px_rgba(245,158,11,0.15)] flex flex-col gap-3.5"
+            className="fixed bottom-6 left-6 right-6 md:left-auto md:right-8 z-50 max-w-2xl w-[calc(100%-3rem)] md:w-auto bg-[#08080a]/95 backdrop-blur-md border border-[#F59E0B]/30 p-5 sm:p-6 rounded-[24px] shadow-[0_15px_50px_rgba(245,158,11,0.25)] flex flex-col sm:flex-row items-center justify-between gap-6"
           >
             {/* Close */}
             <button
@@ -1026,44 +1026,39 @@ export default function App() {
               <X className="w-4 h-4" />
             </button>
 
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-[#F59E0B]/30 flex items-center justify-center text-2xl shrink-0 animate-pulse">
-                🦋
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              {/* Pulsing indicator with glowing border */}
+              <div className="relative flex items-center justify-center w-6 h-6 shrink-0 bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-full">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-[#F59E0B]/50 opacity-75 animate-ping" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#F59E0B]" />
               </div>
-              <div className="space-y-1">
-                <span className="text-[9px] font-mono text-[#F59E0B] uppercase tracking-[0.2em] font-extrabold flex items-center gap-1.5">
-                  <span>SWARM EVENT LIVE</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                </span>
-                <h4 className="text-sm font-sans font-black text-white tracking-tight">
-                  Scan & Mint Butterflies Now!
+
+              <div className="space-y-1.5 text-left">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded border border-[#F59E0B]/60 text-[#F59E0B] text-[9px] sm:text-[10px] font-mono font-black tracking-widest leading-none">
+                    MINT LIVE
+                  </span>
+                  <span className="text-slate-650 text-xs font-bold">•</span>
+                  <span className="text-[10px] sm:text-[11px] font-mono font-black text-slate-400 tracking-widest uppercase leading-none">
+                    SWARM NFT
+                  </span>
+                </div>
+                <h4 className="text-base sm:text-lg font-sans font-black text-white tracking-tight leading-none">
+                  Swarm NFT Ongoing Mint!
                 </h4>
               </div>
             </div>
 
-            <p className="text-slate-350 text-xs leading-relaxed font-sans font-medium">
-              Transform your on-chain journey into reputation. Every action leaves a wingbeat. Join the swarms of self-purifying digital karma.
-            </p>
-
-            <div className="flex items-center gap-2.5 pt-2.5 border-t border-white/5">
-              <button
-                onClick={() => {
-                  setShowPromo(false);
-                  scrollToAnalyzer();
-                }}
-                className="flex-1 py-2 bg-neutral-900 border border-white/10 hover:bg-neutral-800 text-white font-sans font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all text-center cursor-pointer"
-              >
-                Scan First
-              </button>
+            <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
               <a
                 href="https://gravemint.io/mint/FXSVHzLvVFey57U8ETuhHzrzDRT3FhvqzbxWpyoAJA4c"
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => setShowPromo(false)}
-                className="flex-1 py-2 bg-[#F59E0B] hover:bg-amber-400 text-black font-sans font-black text-[10px] uppercase tracking-wider rounded-lg transition-all text-center flex items-center justify-center gap-1 cursor-pointer"
+                className="w-full sm:w-auto px-6 py-3.5 bg-[#F59E0B] hover:bg-amber-400 text-black font-sans font-black text-xs sm:text-sm tracking-wider uppercase rounded-full transition-all text-center flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/25 hover:scale-[1.03] active:scale-97"
               >
-                <span>Mint Now</span>
-                <span>↗</span>
+                <Trophy className="w-4 h-4 shrink-0 text-black" />
+                <span>MINT NOW</span>
               </a>
             </div>
           </motion.div>
