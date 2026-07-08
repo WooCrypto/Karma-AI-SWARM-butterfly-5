@@ -37,6 +37,8 @@ interface SavedOverlay {
   dataUrl: string;
 }
 
+
+
 export default function ProfileOverlay() {
   // Input address or auto-detected address
   const [address, setAddress] = useState<string>('');
@@ -198,6 +200,7 @@ export default function ProfileOverlay() {
 
   // Uploaded image state
   const [uploadedBaseImg, setUploadedBaseImg] = useState<string | null>(null);
+  const [originalUploadedBaseImg, setOriginalUploadedBaseImg] = useState<string | null>(null);
   const [imgName, setImgName] = useState<string>('');
   const [imageRatio, setImageRatio] = useState<number>(1); // width / height
   const [bgType, setBgType] = useState<'image' | 'transparent' | 'dark'>('transparent');
@@ -223,7 +226,6 @@ export default function ProfileOverlay() {
   const [glowColor, setGlowColor] = useState<string>('#F59E0B');
   const [enableGlow, setEnableGlow] = useState<boolean>(true);
   const [keyOutBackground, setKeyOutBackground] = useState<boolean>(false);
-  const [enableSwarmBg, setEnableSwarmBg] = useState<boolean>(false);
   const [swarmTolerance, setSwarmTolerance] = useState<number>(85); // 10 to 200
   const [swarmKeyMode, setSwarmKeyMode] = useState<'auto' | 'white' | 'dark' | 'chroma'>('auto');
   const [swarmChromaColor, setSwarmChromaColor] = useState<string>('#FFFFFF');
@@ -236,7 +238,7 @@ export default function ProfileOverlay() {
       return;
     }
 
-    if (!keyOutBackground && !enableSwarmBg) {
+    if (!keyOutBackground) {
       setCroppedBaseImgUrl(uploadedBaseImg);
       return;
     }
@@ -302,62 +304,106 @@ export default function ProfileOverlay() {
       };
       const chromaRgb = hexToRgb(swarmChromaColor);
 
-      // Run pixel-by-pixel color matching and filtering
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const a = data[i + 3];
+      // Run pixel-by-pixel color matching and filtering restricted to edge-connected areas using a Flood Fill BFS
+      const isBg = new Uint8Array(w * h);
+      const visited = new Uint8Array(w * h);
+      const queue: number[] = [];
 
-        if (a === 0) continue;
+      // Check if a pixel matches background color criteria
+      const checkIsBgColor = (idx: number) => {
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const a = data[idx + 3];
 
-        let isBgColor = false;
+        if (a === 0) return true;
 
         if (swarmKeyMode === 'auto') {
-          // Check similarity to top background colors
           for (const sc of sampledColors) {
             const dist = Math.sqrt(
               Math.pow(r - sc.r, 2) +
               Math.pow(g - sc.g, 2) +
               Math.pow(b - sc.b, 2)
             );
-            if (dist < swarmTolerance) {
-              isBgColor = true;
-              break;
-            }
+            if (dist < swarmTolerance) return true;
           }
           // Fallback basic light/dark corner check
-          if (!isBgColor) {
-            const brightness = (r + g + b) / 3;
-            if (brightness > 235 && swarmTolerance > 40) {
-              isBgColor = true;
-            } else if (brightness < 35 && swarmTolerance > 40) {
-              isBgColor = true;
-            }
-          }
+          const brightness = (r + g + b) / 3;
+          if (brightness > 235 && swarmTolerance > 40) return true;
+          if (brightness < 35 && swarmTolerance > 40) return true;
         } else if (swarmKeyMode === 'white') {
           const brightness = (r + g + b) / 3;
-          if (brightness > (255 - swarmTolerance)) {
-            isBgColor = true;
-          }
+          if (brightness > (255 - swarmTolerance)) return true;
         } else if (swarmKeyMode === 'dark') {
           const brightness = (r + g + b) / 3;
-          if (brightness < swarmTolerance) {
-            isBgColor = true;
-          }
+          if (brightness < swarmTolerance) return true;
         } else if (swarmKeyMode === 'chroma') {
           const dist = Math.sqrt(
             Math.pow(r - chromaRgb.r, 2) +
             Math.pow(g - chromaRgb.g, 2) +
             Math.pow(b - chromaRgb.b, 2)
           );
-          if (dist < swarmTolerance) {
-            isBgColor = true;
+          if (dist < swarmTolerance) return true;
+        }
+        return false;
+      };
+
+      // Seed points: top border, upper left/right borders
+      const seedPoints: { x: number; y: number }[] = [];
+      // Top edge
+      for (let sx = 0; sx < w; sx += Math.max(1, Math.floor(w / 30))) {
+        seedPoints.push({ x: sx, y: 0 });
+        if (h > 5) seedPoints.push({ x: sx, y: 4 });
+      }
+      // Left and right edges (upper half only to avoid shoulders)
+      for (let sy = 0; sy < h / 2; sy += Math.max(1, Math.floor(h / 30))) {
+        seedPoints.push({ x: 0, y: sy });
+        seedPoints.push({ x: w - 1, y: sy });
+      }
+
+      seedPoints.forEach(p => {
+        const idx = p.y * w + p.x;
+        if (idx >= 0 && idx < w * h) {
+          if (!visited[idx] && checkIsBgColor(idx * 4)) {
+            queue.push(idx);
+            visited[idx] = 1;
+            isBg[idx] = 1;
           }
         }
+      });
 
-        if (isBgColor) {
-          data[i + 3] = 0; // Transparent
+      // BFS Queue processing
+      let head = 0;
+      while (head < queue.length) {
+        const curr = queue[head++];
+        const cx = curr % w;
+        const cy = Math.floor(curr / w);
+
+        const neighbors = [
+          { x: cx - 1, y: cy },
+          { x: cx + 1, y: cy },
+          { x: cx, y: cy - 1 },
+          { x: cx, y: cy + 1 }
+        ];
+
+        for (const n of neighbors) {
+          if (n.x >= 0 && n.x < w && n.y >= 0 && n.y < h) {
+            const nIdx = n.y * w + n.x;
+            if (!visited[nIdx]) {
+              visited[nIdx] = 1;
+              if (checkIsBgColor(nIdx * 4)) {
+                isBg[nIdx] = 1;
+                queue.push(nIdx);
+              }
+            }
+          }
+        }
+      }
+
+      // Crop the confirmed background pixels
+      for (let i = 0; i < w * h; i++) {
+        if (isBg[i]) {
+          data[i * 4 + 3] = 0;
         }
       }
 
@@ -387,7 +433,7 @@ export default function ProfileOverlay() {
       setCroppedBaseImgUrl(canvas.toDataURL('image/png'));
     };
     img.src = uploadedBaseImg;
-  }, [uploadedBaseImg, keyOutBackground, enableSwarmBg, swarmKeyMode, swarmTolerance, swarmChromaColor]);
+  }, [uploadedBaseImg, keyOutBackground, swarmKeyMode, swarmTolerance, swarmChromaColor]);
 
   // 3D PFP Ring variables
   const [enablePfpRing, setEnablePfpRing] = useState<boolean>(true);
@@ -581,6 +627,7 @@ export default function ProfileOverlay() {
     reader.onload = (e) => {
       const src = e.target?.result as string;
       setUploadedBaseImg(src);
+      setOriginalUploadedBaseImg(src);
       setBgType('image');
 
       // Extract ratio
@@ -627,7 +674,7 @@ export default function ProfileOverlay() {
 
     try {
       // 1. Load background if image mode is active and we have an image
-      const useBgImage = uploadedBaseImg && (bgType === 'image' || enableSwarmBg);
+      const useBgImage = uploadedBaseImg && bgType === 'image';
       const baseImg = new Image();
       
       if (useBgImage && uploadedBaseImg) {
@@ -671,11 +718,7 @@ export default function ProfileOverlay() {
       ctx.imageSmoothingQuality = 'high';
 
       // 4. Draw profile background
-      if (enableSwarmBg) {
-        // Draw solid SWARM Orange background
-        ctx.fillStyle = '#F59E0B';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else if (bgType === 'dark') {
+      if (bgType === 'dark') {
         // Draw solid dark background
         ctx.fillStyle = '#070708';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -716,8 +759,8 @@ export default function ProfileOverlay() {
 
           tempCtx.drawImage(baseImg, x, y, w, h);
 
-          // Apply intelligent key-out background effect if requested or if Swarm mode is active
-          if (keyOutBackground || enableSwarmBg) {
+          // Apply intelligent key-out background effect if requested
+          if (keyOutBackground) {
             const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
             const data = imgData.data;
 
@@ -757,68 +800,112 @@ export default function ProfileOverlay() {
             };
             const chromaRgb = hexToRgb(swarmChromaColor);
 
-            // Run pixel-by-pixel color matching and filtering
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
-              const a = data[i + 3];
+            // Run pixel-by-pixel color matching and filtering restricted to edge-connected areas using a Flood Fill BFS
+            const compW = tempCanvas.width;
+            const compH = tempCanvas.height;
+            const isBg = new Uint8Array(compW * compH);
+            const visited = new Uint8Array(compW * compH);
+            const queue: number[] = [];
 
-              if (a === 0) continue;
+            // Check if a pixel matches background color criteria
+            const checkIsBgColor = (idx: number) => {
+              const r = data[idx];
+              const g = data[idx + 1];
+              const b = data[idx + 2];
+              const a = data[idx + 3];
 
-              let isBgColor = false;
+              if (a === 0) return true;
 
               if (swarmKeyMode === 'auto') {
-                // 1. Check similarity to corner background colors
                 for (const sc of sampledColors) {
                   const dist = Math.sqrt(
                     Math.pow(r - sc.r, 2) +
                     Math.pow(g - sc.g, 2) +
                     Math.pow(b - sc.b, 2)
                   );
-                  if (dist < swarmTolerance) {
-                    isBgColor = true;
-                    break;
-                  }
+                  if (dist < swarmTolerance) return true;
                 }
                 // Fallback basic light/dark corner check
-                if (!isBgColor) {
-                  const brightness = (r + g + b) / 3;
-                  if (brightness > 235 && swarmTolerance > 40) {
-                    isBgColor = true;
-                  } else if (brightness < 35 && swarmTolerance > 40) {
-                    isBgColor = true;
-                  }
-                }
+                const brightness = (r + g + b) / 3;
+                if (brightness > 235 && swarmTolerance > 40) return true;
+                if (brightness < 35 && swarmTolerance > 40) return true;
               } else if (swarmKeyMode === 'white') {
                 const brightness = (r + g + b) / 3;
-                if (brightness > (255 - swarmTolerance)) {
-                  isBgColor = true;
-                }
+                if (brightness > (255 - swarmTolerance)) return true;
               } else if (swarmKeyMode === 'dark') {
                 const brightness = (r + g + b) / 3;
-                if (brightness < swarmTolerance) {
-                  isBgColor = true;
-                }
+                if (brightness < swarmTolerance) return true;
               } else if (swarmKeyMode === 'chroma') {
                 const dist = Math.sqrt(
                   Math.pow(r - chromaRgb.r, 2) +
                   Math.pow(g - chromaRgb.g, 2) +
                   Math.pow(b - chromaRgb.b, 2)
                 );
-                if (dist < swarmTolerance) {
-                  isBgColor = true;
+                if (dist < swarmTolerance) return true;
+              }
+              return false;
+            };
+
+            // Seed points: top border, upper left/right borders
+            const seedPoints: { x: number; y: number }[] = [];
+            // Top edge
+            for (let sx = 0; sx < compW; sx += Math.max(1, Math.floor(compW / 30))) {
+              seedPoints.push({ x: sx, y: 0 });
+              if (compH > 5) seedPoints.push({ x: sx, y: 4 });
+            }
+            // Left and right edges (upper half only to avoid shoulders)
+            for (let sy = 0; sy < compH / 2; sy += Math.max(1, Math.floor(compH / 30))) {
+              seedPoints.push({ x: 0, y: sy });
+              seedPoints.push({ x: compW - 1, y: sy });
+            }
+
+            seedPoints.forEach(p => {
+              const idx = p.y * compW + p.x;
+              if (idx >= 0 && idx < compW * compH) {
+                if (!visited[idx] && checkIsBgColor(idx * 4)) {
+                  queue.push(idx);
+                  visited[idx] = 1;
+                  isBg[idx] = 1;
                 }
               }
+            });
 
-              if (isBgColor) {
-                data[i + 3] = 0; // Set alpha to 0 (cropped out!)
+            // BFS Queue processing
+            let head = 0;
+            while (head < queue.length) {
+              const curr = queue[head++];
+              const cx = curr % compW;
+              const cy = Math.floor(curr / compW);
+
+              const neighbors = [
+                { x: cx - 1, y: cy },
+                { x: cx + 1, y: cy },
+                { x: cx, y: cy - 1 },
+                { x: cx, y: cy + 1 }
+              ];
+
+              for (const n of neighbors) {
+                if (n.x >= 0 && n.x < compW && n.y >= 0 && n.y < compH) {
+                  const nIdx = n.y * compW + n.x;
+                  if (!visited[nIdx]) {
+                    visited[nIdx] = 1;
+                    if (checkIsBgColor(nIdx * 4)) {
+                      isBg[nIdx] = 1;
+                      queue.push(nIdx);
+                    }
+                  }
+                }
+              }
+            }
+
+            // Crop the confirmed background pixels
+            for (let i = 0; i < compW * compH; i++) {
+              if (isBg[i]) {
+                data[i * 4 + 3] = 0;
               }
             }
 
             // State-of-the-art Edge Feathering Anti-Aliasing pass
-            const compW = tempCanvas.width;
-            const compH = tempCanvas.height;
             const alphaBuffer = new Uint8Array(compW * compH);
             for (let y = 0; y < compH; y++) {
               for (let x = 0; x < compW; x++) {
@@ -1390,7 +1477,6 @@ export default function ProfileOverlay() {
     setPfpRingThickness(12);
     setPfpRingGlow(15);
     setPfpRingDiameter(92);
-    setEnableSwarmBg(false);
   };
 
   const removeSavedCreation = (id: string, e: MouseEvent) => {
@@ -1443,27 +1529,29 @@ export default function ProfileOverlay() {
             <button
               onClick={() => {
                 setActiveTab('editor');
-                setEnableSwarmBg(false);
+                if (originalUploadedBaseImg) {
+                  setUploadedBaseImg(originalUploadedBaseImg);
+                }
               }}
               className={`px-4 py-1.5 rounded-lg text-xs font-sans font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === 'editor' 
                   ? 'bg-[#F59E0B] text-black shadow' 
                   : 'text-slate-400 hover:text-white'
               }`}
+              id="editor-tab-btn"
             >
               Badge Generator
             </button>
             <button
               onClick={() => {
                 setActiveTab('swarm');
-                setEnableSwarmBg(true); // Auto-activate swarm background mode when clicking the tab
-                setKeyOutBackground(true);
               }}
               className={`px-4 py-1.5 rounded-lg text-xs font-sans font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'swarm' 
                   ? 'bg-[#F59E0B] text-black shadow' 
                   : 'text-slate-400 hover:text-[#F59E0B]'
               }`}
+              id="swarm-tab-btn"
             >
               <Flame className="w-3.5 h-3.5" />
               <span>SWARM Theme</span>
@@ -1471,7 +1559,6 @@ export default function ProfileOverlay() {
             <button
               onClick={() => {
                 setActiveTab('library');
-                setEnableSwarmBg(false);
               }}
               className={`px-4 py-1.5 rounded-lg text-xs font-sans font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'library' 
@@ -1630,16 +1717,14 @@ export default function ProfileOverlay() {
                   onTouchEnd={handleTouchEnd}
                   onWheel={handleWheel}
                   className={`relative w-full max-w-[340px] md:max-w-[400px] aspect-square rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center overflow-hidden shadow-inner transition-all select-none ${
-                    enableSwarmBg
-                      ? 'bg-[#F59E0B]'
-                      : bgType === 'transparent'
+                    bgType === 'transparent'
                       ? 'bg-[linear-gradient(45deg,#161617_25%,transparent_25%),linear-gradient(-45deg,#161617_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#161617_75%),linear-gradient(-45deg,transparent_75%,#161617_75%)] bg-[size:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0] bg-[#070708]'
                       : bgType === 'dark'
                       ? 'bg-[#0B0B0C]'
                       : 'bg-[#070708]'
                   }`}
                 >
-                  {(bgType === 'image' || enableSwarmBg) && !uploadedBaseImg ? (
+                  {(bgType === 'image' || activeTab === 'swarm') && !uploadedBaseImg ? (
                     <div className="text-center p-8 space-y-4">
                       <div className="w-16 h-16 rounded-2xl bg-amber-500/5 border border-[#F59E0B]/20 flex items-center justify-center text-4xl mx-auto animate-bounce duration-1000">
                         📸
@@ -1661,7 +1746,7 @@ export default function ProfileOverlay() {
                     <div className="relative w-full h-full flex items-center justify-center overflow-hidden rounded-xl">
                       
                       {/* Base Image */}
-                      {(bgType === 'image' || enableSwarmBg) && uploadedBaseImg && (
+                      {(bgType === 'image' || activeTab === 'swarm') && uploadedBaseImg && (
                         <div 
                           className="w-full h-full transition-transform duration-75 pointer-events-none"
                           style={{
@@ -1763,7 +1848,7 @@ export default function ProfileOverlay() {
                 <div className="w-full mt-6 space-y-3 pt-4 border-t border-white/5">
                   <div className="flex flex-col sm:flex-row gap-3 w-full">
                     <button
-                      disabled={isGenerating || ((bgType === 'image' || enableSwarmBg) && !uploadedBaseImg)}
+                      disabled={isGenerating || ((bgType === 'image' || activeTab === 'swarm') && !uploadedBaseImg)}
                       onClick={handleDownload}
                       className="flex-1 py-3 bg-[#F59E0B] disabled:bg-amber-500/10 disabled:text-slate-500 disabled:cursor-not-allowed text-black rounded-xl text-xs font-sans font-black uppercase tracking-widest flex items-center justify-center gap-1.5 hover:scale-[1.01] transition-all cursor-pointer shadow-lg shadow-amber-500/10 font-extrabold"
                     >
@@ -1781,7 +1866,7 @@ export default function ProfileOverlay() {
                     </button>
                   </div>
 
-                  {(uploadedBaseImg || (bgType !== 'image' && !enableSwarmBg)) && (
+                  {(uploadedBaseImg || (bgType !== 'image' && activeTab !== 'swarm')) && (
                     <div className="space-y-2">
                       <span className="text-[8.5px] font-mono text-slate-500 uppercase tracking-widest block text-center">Export Custom Platform Crop Size presets:</span>
                       <div className="grid grid-cols-4 gap-2 text-center text-[9px] font-mono text-slate-300">
@@ -2230,7 +2315,6 @@ export default function ProfileOverlay() {
                     </div>
                   </div>
                 </div>
-
               </div>
             ) : (
               /* Box 3: SWARM Theme Controls */
@@ -2241,168 +2325,18 @@ export default function ProfileOverlay() {
                     <span>SWARM CAMPAIGN</span>
                   </span>
                   <h3 className="text-sm font-sans font-black text-white tracking-tight">
-                    SWARM Orange Background Tool
+                    SWARM Campaign Suite
                   </h3>
                   <p className="text-slate-400 text-[11px] mt-1.5 leading-relaxed">
-                    Convert any profile image or uploaded NFT into an official orange SWARM campaign PFP. This tool fills the background with the vibrant orange branding, keys out solid white or light backdrops, and layers your unique Karma Butterfly badge beautifully.
+                    Personalize your identity for the SWARM campaign. This tool allows you to layer the glowing PFP frame, add the custom brand checkmark badge, and customize settings.
                   </p>
                 </div>
 
-                {/* SWARM Toggle Card */}
-                <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl space-y-3.5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-white block">SWARM Background Color</span>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">Toggle solid brand orange</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        const nextVal = !enableSwarmBg;
-                        setEnableSwarmBg(nextVal);
-                        if (nextVal) {
-                          // Automatically set up best settings for swarm mode
-                          setKeyOutBackground(true);
-                          setPfpRingColor('#FFFFFF'); // white contrast ring
-                          setSelectedBadge('holder');
-                        }
-                      }}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-250 ease-in-out focus:outline-none ${
-                        enableSwarmBg ? 'bg-[#F59E0B]' : 'bg-[#222223]'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-250 ease-in-out ${
-                          enableSwarmBg ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2 bg-black/40 p-2.5 rounded-lg border border-white/5">
-                    <div className="w-5 h-5 rounded bg-[#F59E0B] shrink-0 border border-white/10" />
-                    <div className="text-[10px] font-mono text-slate-300">
-                      Active Shade: <span className="text-[#F59E0B] font-bold">#F59E0B (Swarm Orange)</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Intelligent Key out settings for PFP/NFT */}
+                {/* Ring color selector specifically styled for Swarm */}
                 <div className="space-y-4">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block font-bold">INTELLIGENT BACKGROUND CROPPING</span>
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block font-bold">SWARM FRAME SETTINGS</span>
                   
-                  <div className="bg-black/25 p-4 rounded-xl border border-white/5 space-y-4">
-                    {/* Toggle Backdrop Crop */}
-                    <div className="flex items-center justify-between pb-3 border-b border-white/5">
-                      <div>
-                        <span className="text-xs font-bold text-white block">Backdrop Removal</span>
-                        <span className="text-[9.5px] text-slate-400 block mt-0.5">Crop original background out</span>
-                      </div>
-                      <button
-                        onClick={() => setKeyOutBackground(!keyOutBackground)}
-                        className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-250 ease-in-out focus:outline-none ${
-                          keyOutBackground ? 'bg-[#F59E0B]' : 'bg-[#222223]'
-                        }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-250 ease-in-out ${
-                            keyOutBackground ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </div>
-
-                    {keyOutBackground && (
-                      <div className="space-y-4 pt-1">
-                        {/* 1. Backdrop Crop Mode */}
-                        <div className="space-y-2">
-                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Crop Detection Mode</span>
-                          <div className="grid grid-cols-2 gap-1.5 text-xs">
-                            {[
-                              { id: 'auto', label: '🪄 Auto Corner' },
-                              { id: 'white', label: '⚪ Crop White' },
-                              { id: 'dark', label: '⚫ Crop Dark' },
-                              { id: 'chroma', label: '🎨 Color Picker' },
-                            ].map(mode => (
-                              <button
-                                key={mode.id}
-                                onClick={() => setSwarmKeyMode(mode.id as any)}
-                                className={`py-2 px-2.5 rounded-lg border text-left font-sans font-bold text-[9.5px] uppercase tracking-wider transition cursor-pointer ${
-                                  swarmKeyMode === mode.id 
-                                    ? 'bg-neutral-800 border-[#F59E0B]/50 text-[#F59E0B]' 
-                                    : 'bg-black/20 border-white/5 text-slate-400 hover:text-white'
-                                }`}
-                              >
-                                {mode.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* 2. Custom Chroma color picker */}
-                        {swarmKeyMode === 'chroma' && (
-                          <div className="space-y-2 bg-black/40 p-3 rounded-lg border border-white/5">
-                            <span className="text-[9.5px] font-mono text-slate-400 uppercase tracking-wider block">Target Background Color</span>
-                            <div className="flex items-center gap-3">
-                              <input
-                                type="color"
-                                value={swarmChromaColor}
-                                onChange={(e) => setSwarmChromaColor(e.target.value)}
-                                className="w-8 h-8 rounded border border-white/10 bg-transparent cursor-pointer"
-                              />
-                              <div className="flex-1">
-                                <input
-                                  type="text"
-                                  value={swarmChromaColor}
-                                  onChange={(e) => setSwarmChromaColor(e.target.value)}
-                                  className="w-full bg-black/35 border border-white/5 rounded px-2.5 py-1 text-xs text-white font-mono uppercase"
-                                />
-                              </div>
-                            </div>
-                            <div className="flex gap-1 pt-1.5 overflow-x-auto">
-                              {['#FFFFFF', '#000000', '#00FF00', '#0000FF', '#CCCCCC'].map(preset => (
-                                <button
-                                  key={preset}
-                                  onClick={() => setSwarmChromaColor(preset)}
-                                  className={`px-2 py-0.5 text-[8.5px] font-mono rounded border ${
-                                    swarmChromaColor.toUpperCase() === preset.toUpperCase()
-                                      ? 'bg-neutral-800 border-white/40 text-white'
-                                      : 'bg-black/20 border-white/5 text-slate-500 hover:text-slate-300'
-                                  }`}
-                                >
-                                  {preset === '#FFFFFF' ? 'White' : preset === '#000000' ? 'Black' : preset === '#00FF00' ? 'Green' : preset === '#0000FF' ? 'Blue' : 'Grey'}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 3. Crop Intensity (Tolerance) Slider */}
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between text-[10px] font-mono">
-                            <span className="text-slate-400 uppercase">Crop Sensitivity (Tolerance)</span>
-                            <span className="text-[#F59E0B] font-bold">{swarmTolerance}</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="5"
-                            max={swarmKeyMode === 'white' || swarmKeyMode === 'dark' ? "250" : "180"}
-                            value={swarmTolerance}
-                            onChange={(e) => setSwarmTolerance(parseInt(e.target.value))}
-                            className="w-full accent-[#F59E0B] cursor-pointer h-1 bg-[#1A1A1A] rounded-lg"
-                          />
-                          <p className="text-[9px] text-slate-500 font-mono leading-tight pt-1">
-                            {swarmKeyMode === 'auto' && "Increase to remove background shades similar to the corners. Decrease to preserve details."}
-                            {swarmKeyMode === 'white' && "Higher sensitivity cuts out darker shades of white and light greys."}
-                            {swarmKeyMode === 'dark' && "Higher sensitivity cuts out lighter shades of black and dark greys."}
-                            {swarmKeyMode === 'chroma' && "Adjust similarity check for custom backdrop color."}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ring color selector specifically styled for Swarm */}
-                  <div className="space-y-2 bg-[#1A1A1A]/40 p-3 rounded-xl border border-white/5">
+                  <div className="space-y-3 bg-black/25 p-4 rounded-xl border border-white/5">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-slate-300 flex items-center gap-2 cursor-pointer">
                         <input
@@ -2411,7 +2345,7 @@ export default function ProfileOverlay() {
                           onChange={(e) => setEnablePfpRing(e.target.checked)}
                           className="rounded border-white/10 text-[#F59E0B] focus:ring-0 cursor-pointer"
                         />
-                        <span>Glowing Ring Framing</span>
+                        <span>Enable Glowing Ring Framing</span>
                       </label>
                       {enablePfpRing && (
                         <div 
@@ -2438,13 +2372,38 @@ export default function ProfileOverlay() {
                   </div>
                 </div>
 
+                {/* Optional Badge picker */}
+                <div className="pt-3 border-t border-white/5 space-y-2">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">CHOOSE BRAND BADGE OVERLAY</span>
+                  <div className="grid grid-cols-2 gap-1.5 text-xs">
+                    {[
+                      { id: 'none', label: 'No Badge' },
+                      { id: 'holder', label: '🦋 Karma Holder' },
+                      { id: 'genesis', label: '✦ Genesis Pill' },
+                      { id: 'verified', label: '✓ Karma Verified' },
+                    ].map(b => (
+                      <button
+                        key={b.id}
+                        onClick={() => setSelectedBadge(b.id as any)}
+                        className={`py-1.5 px-2.5 rounded-lg border text-left font-sans font-bold text-[10px] uppercase tracking-wider transition ${
+                          selectedBadge === b.id 
+                            ? 'bg-neutral-800 border-[#F59E0B]/50 text-[#F59E0B]' 
+                            : 'bg-black/20 border-white/5 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Easy Quick Actions info */}
                 <div className="text-[10px] font-mono text-slate-500 leading-relaxed bg-[#1A1A1A]/40 p-3 rounded-xl border border-white/5">
                   <span className="text-[#F59E0B] font-bold block mb-1">💡 QUICK WORKFLOW:</span>
                   1. Go to the "Attach Canvas File" panel on the left.<br />
-                  2. Upload your current profile picture, avatar, or NFT.<br />
-                  3. Turn on the "SWARM Background Color" toggle.<br />
-                  4. Your avatar background turns orange! Adjust positioning and download!
+                  2. Upload your current profile picture or avatar.<br />
+                  3. Use "Extract Subject with AI" to isolate your character.<br />
+                  4. Layer the custom brand badge and glowing frame, then download!
                 </div>
               </div>
             )}
